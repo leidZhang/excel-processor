@@ -1,6 +1,6 @@
 # excel-processor
 ## Introduction
-This is a simple excel file process program that I created with Python. 
+This is a simple excel file process program that I created with Python. Users can use this program to perform CRUD operations on Excel files
 
 ## How to Use
 To start the program, double click main.py, then click "Open Excel File" button and select a valid excel file, then the table will be showed above. Users can select one of the row and update or delete it. The home menu also have fuzzy search function, an advanced search function is also provided. 
