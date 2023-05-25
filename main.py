@@ -36,8 +36,100 @@ class ExcelProcessor:
                 self.df = pd.read_excel(filePath)
                 self.filePath = filePath
                 self.initTree()
+                print("File Opened")
             except pd.errors.ParserError: 
                 messagebox.showerror("Error", "Please open a valid Excel File")
+
+    def handleFuzzySearch(self, entry):
+        self.tree.delete(*self.tree.get_children())
+
+        res = pd.DataFrame([])
+        inputData = entry.get()
+        print("Searching " + inputData + "...")
+        
+        colNames = self.df.columns.tolist()
+        if (inputData == ""): 
+            print("No specific condition, printing all data...")
+            inputData = "all rows"
+            res = self.df
+        else: 
+            print("Searching " + inputData)
+            # search each columns
+            for colName in colNames: 
+                matchingRows = self.df[self.df[colName].astype(str).str.contains(inputData, case=False)]
+                print(matchingRows)
+                res = pd.concat([res, matchingRows], ignore_index=True)
+         
+        for row in res.itertuples(index=False): 
+            self.tree.insert("", "end", values=row) 
+
+        # self.tree.place(x=10, y=50, height=500)
+
+    def handleAdvSearch(self, colNames, inputEntries, initX, initY, cnt): 
+        print("Searching...")
+        # get user input 
+        inputData = {}
+        for colName in colNames:
+            entryValue = inputEntries[colName].get()
+            inputData[colName] = entryValue
+
+        # accurate search 
+        matchingRows = []
+        for i, row in self.df.iterrows():
+            match = True
+            for colName, value in inputData.items(): 
+                print("Searching: " + colName + ", " + value)
+                print("Getting: " + colName + ", " + str(row[colName]))
+                if str(inputData[colName]) == "":
+                    print("The column " + colName + "is empty") 
+                    continue
+                if str(row[colName]) != value: 
+                    match = False
+                    break
+            if match: 
+                matchingRows.append(row)
+        matchingDf = pd.DataFrame(matchingRows)
+
+        cols = tuple(colNames)
+        self.tree = ttk.Treeview(root, columns=cols, show="headings")
+        self.tree.bind("<<TreeviewSelect>>", self.itemSelected)
+        for col in cols: 
+            self.tree.heading(col, text=col)        
+        for row in matchingDf.itertuples(index=False): 
+            self.tree.insert("", "end", values=row) 
+
+        self.tree.place(x=initX + 400, y=initY, height=500)
+
+    def advSearch(self): 
+        print("Switch to advanced search")
+        if (self.df is None): 
+            print("Please open a valid Excel File")
+            return 
+        
+        # clear GUI
+        for widget in self.root.winfo_children():
+            widget.destroy()
+
+        # generate form
+        initX = 10
+        initY = 10
+        cnt = 0
+        colNames = self.df.columns.tolist()
+        inputEntries = {}
+        for colName in colNames:
+            label = tk.Label(self.root, text=colName)
+            entry = tk.Entry(self.root)
+            label.place(x=initX, y=initY + cnt * 30)
+            entry.place(x=initX + 100, y=initY + cnt * 30)     
+            cnt += 1
+            
+            inputEntries[colName] = entry
+
+        # generate other components
+        searchButton = tk.Button(self.root, text="Search", command=lambda: self.handleAdvSearch(colNames, inputEntries, initX, initY, cnt))
+        cancelButton = tk.Button(self.root, text="Cancel", command=self.initHomeMenu)
+        searchButton.place(x=initX + 100, y=initY + cnt * 30)
+        cancelButton.place(x=initX + 160, y=initY + cnt * 30)
 
     def initHomeMenu(self): 
         print("Main menu")
@@ -46,13 +138,17 @@ class ExcelProcessor:
             widget.destroy()
 
         # generate buttons
+        entry = tk.Entry(root, text="")
         openButton = tk.Button(root, text="Open Excel file", command=self.openFile)
+        searchButton = tk.Button(root, text="Search", command=lambda: self.handleFuzzySearch(entry))
         insertButton = tk.Button(root, text="Insert Data", command=self.insertData)
-        searchButton = tk.Button(root, text="Search Data", command=self.initSearch)
+        AdvSearchButton = tk.Button(root, text="Advanced Search", command=self.advSearch)
 
         openButton.place(x=10, y=10) 
-        insertButton.place(x=120, y=10) 
-        searchButton.place(x=210, y=10) 
+        entry.place(x=115, y=15)
+        searchButton.place(x=265, y=10)
+        insertButton.place(x=320, y=10) 
+        AdvSearchButton.place(x=400, y=10) 
 
         if self.df is not None:
             self.initTree()
@@ -113,120 +209,6 @@ class ExcelProcessor:
         submitButton.place(x=initX + 100, y=initY + cnt * 30)
         cancelButton.place(x=initX + 160, y=initY + cnt * 30)
         resLablel.place(x=initX, y=initY + (cnt + 1) * 30)
-
-    def handleAccurateSearch(self, colNames, inputEntries, initX, initY, cnt): 
-        print("Searching...")
-        # get user input 
-        inputData = {}
-        for colName in colNames:
-            entryValue = inputEntries[colName].get()
-            inputData[colName] = entryValue
-
-        # accurate search 
-        matchingRows = []
-        for i, row in self.df.iterrows():
-            match = True
-            for colName, value in inputData.items(): 
-                print("Searching: " + colName + ", " + value)
-                print("Getting: " + colName + ", " + str(row[colName]))
-                if str(inputData[colName]) == "":
-                    print("The column " + colName + "is empty") 
-                    continue
-                if str(row[colName]) != value: 
-                    match = False
-                    break
-            if match: 
-                matchingRows.append(row)
-        matchingDf = pd.DataFrame(matchingRows)
-
-        cols = tuple(colNames)
-        self.tree = ttk.Treeview(root, columns=cols, show="headings")
-        self.tree.bind("<<TreeviewSelect>>", self.itemSelected)
-        for col in cols: 
-            self.tree.heading(col, text=col)        
-        for row in matchingDf.itertuples(index=False): 
-            self.tree.insert("", "end", values=row) 
-
-        self.tree.place(x=initX, y=initY + (cnt + 1) * 30 + 10, height=500)
-
-    def accurateSearch(self): 
-        print("Switch to accurate search")
-        # clear GUI
-        for widget in self.root.winfo_children():
-            widget.destroy()
-
-        # generate form
-        initX = 10
-        initY = 10
-        cnt = 0
-        colNames = self.df.columns.tolist()
-        inputEntries = {}
-        for colName in colNames:
-            label = tk.Label(self.root, text=colName)
-            entry = tk.Entry(self.root)
-            label.place(x=initX, y=initY + cnt * 30)
-            entry.place(x=initX + 100, y=initY + cnt * 30)     
-            cnt += 1
-            
-            inputEntries[colName] = entry
-
-        # generate other components
-        searchButton = tk.Button(self.root, text="Search", command=lambda: self.handleAccurateSearch(colNames, inputEntries, initX, initY, cnt))
-        cancelButton = tk.Button(self.root, text="Cancel", command=self.initSearch)
-        searchButton.place(x=initX + 100, y=initY + cnt * 30)
-        cancelButton.place(x=initX + 160, y=initY + cnt * 30)
-
-    def handleFuzzySearch(self, entry):
-        res = pd.DataFrame([])
-        inputData = entry.get()
-        print("Searching " + inputData + "...")
-        
-        colNames = self.df.columns.tolist()
-        if (inputData == ""): 
-            print("No specific condition, printing all data...")
-            inputData = "all rows"
-            res = self.df
-        else: 
-            print("Searching " + inputData)
-            # search each columns
-            for colName in colNames: 
-                matchingRows = self.df[self.df[colName].astype(str).str.contains(inputData, case=False)]
-                print(colName)
-                print(matchingRows)
-                res = pd.concat([res, matchingRows], ignore_index=True)
-        
-        cols = tuple(colNames)
-        self.tree = ttk.Treeview(root, columns=cols, show="headings")
-        self.tree.bind("<<TreeviewSelect>>", self.itemSelected)
-        for col in cols: 
-            self.tree.heading(col, text=col)        
-        for row in res.itertuples(index=False): 
-            self.tree.insert("", "end", values=row) 
-
-        self.tree.place(x=10, y=50, height=500)
-
-    def initSearch(self):
-        print("Search data")
-        if self.df is None: 
-            print("Please open an excel file")
-            return 
-        
-        # clear GUI
-        for widget in self.root.winfo_children():
-            widget.destroy()
-
-        # generate layout
-        entry = tk.Entry(root)
-        label = tk.Label(root, text="Search:")
-        fuzzySerachButton = tk.Button(root, text="Serach", command=lambda: self.handleFuzzySearch(entry))
-        accurateSearchButton = tk.Button(root, text="Accuarte Serach", command=self.accurateSearch)
-        cancelButton = tk.Button(self.root, text="Cancel", command=self.initHomeMenu)
-
-        label.place(x=10, y=15)
-        entry.place(x=80, y=15)
-        fuzzySerachButton.place(x=240, y=10)
-        accurateSearchButton.place(x=300, y=10)
-        cancelButton.place(x=415, y=10)
 
 root = tk.Tk()
 root.title("Simple Excel Processor")
