@@ -8,29 +8,101 @@ class ExcelProcessor:
     def __init__(self):
         self.df = None
         self.tree = None
+        self.selectedID = None
         self.selected = None
 
     def itemSelected(self, event): 
         selectedItem = self.tree.focus()
         id = int(selectedItem[1:], 16)
+        self.selectedID = id-1
         self.selected = self.df.loc[id-1]
-        print(self.selected)
+        print(self.selectedID)
+
+    def genForm(self, mode): 
+        if self.df is None: 
+            print("Please open an excel file")
+            return 
+        print("Generating form...")
+
+        # clear layout
+        for widget in self.root.winfo_children():
+            widget.destroy()
+
+        # generate form
+        initX = 10
+        initY = 10
+        cnt = 0
+        colNames = self.df.columns.tolist()
+        inputEntries = {}
+        for colName in colNames:
+            label = tk.Label(self.root, text=colName)
+            entry = tk.Entry(self.root, name=str(cnt))
+            label.place(x=initX, y=initY + cnt * 30)
+            entry.place(x=initX + 100, y=initY + cnt * 30)   
+            cnt += 1 
+            
+            inputEntries[colName] = entry
+
+        # generate other components
+        resLablel = tk.Label(self.root, text="")        
+        cancelButton = tk.Button(self.root, text="Cancel", command=self.initHomeMenu)
+        cancelButton.place(x=initX + 160, y=initY + cnt * 30)
+        resLablel.place(x=initX, y=initY + (cnt + 1) * 30)
+
+        if mode == "Insert": 
+            submitButton = tk.Button(self.root, text=mode, command=lambda: self.handleInsertData(colNames, inputEntries, resLablel))
+            submitButton.place(x=initX + 100, y=initY + cnt * 30)
+        else: 
+            updateButton = tk.Button(self.root, text=mode, command=lambda: self.handleUpdateData(inputEntries))
+            updateButton.place(x=initX + 100, y=initY + cnt * 30)
+        
+        print("Generationg complete")
     
     def UpdateData(self): 
-        print("Click update")
-        # impl update
+        # generate form
         self.genForm("Update")
-        return None
+
+        # fill the form
+        cnt = 0        
+        colNames = self.df.columns.to_list()
+        for colName in colNames: 
+            entry = root.nametowidget(str(cnt))
+            value = self.selected[colName]
+            entry.insert(0, value)
+            cnt += 1
     
-    def handleUpdateData(self):
+    def handleUpdateData(self, inputEntries):
         print("Handling update...")
-        # impl hanlde update
-        return None
+
+        data = {}
+        for key, value in inputEntries.items(): 
+            data[key] = value.get()        
+        newDf = pd.DataFrame(data, index=[0]) 
+        self.df.loc[self.selectedID] = newDf.loc[0]
+        
+        print(newDf)
+        self.selected = None
+        self.selectedID = None
+
+        # save updated DataFrame to Excel File
+        self.df.to_excel(self.filePath, index=False)
+        print("Update successful")
     
     def handleDeleteData(self):
-        print("Click delete")
-        # impl delete
-        return None 
+        print("Executing deletion...")
+        
+        # execute deletion
+        try: 
+            self.df.drop(index=self.selectedID, inplace=True)
+            self.df.to_excel(self.filePath, index=False)
+            self.selected = None
+            self.selectedID = None
+            print("Delete successful")
+        except: 
+            print("Deletion failed")
+
+        # refresh home menu
+        self.initHomeMenu()
 
     def initTree(self):
         colNames = self.df.columns.tolist()
@@ -164,46 +236,6 @@ class ExcelProcessor:
         cancelButton = tk.Button(self.root, text="Cancel", command=self.initHomeMenu)
         searchButton.place(x=initX + 100, y=initY + cnt * 30)
         cancelButton.place(x=initX + 160, y=initY + cnt * 30)
-
-    def genForm(self, mode): 
-        if self.df is None: 
-            print("Please open an excel file")
-            return 
-        print("Generating form...")
-
-        # clear layout
-        for widget in self.root.winfo_children():
-            widget.destroy()
-
-        # generate form
-        initX = 10
-        initY = 10
-        cnt = 0
-        colNames = self.df.columns.tolist()
-        inputEntries = {}
-        for colName in colNames:
-            label = tk.Label(self.root, text=colName)
-            entry = tk.Entry(self.root)
-            label.place(x=initX, y=initY + cnt * 30)
-            entry.place(x=initX + 100, y=initY + cnt * 30)   
-            cnt += 1 
-            
-            inputEntries[colName] = entry
-
-        # generate other components
-        resLablel = tk.Label(self.root, text="")        
-        cancelButton = tk.Button(self.root, text="Cancel", command=self.initHomeMenu)
-        cancelButton.place(x=initX + 160, y=initY + cnt * 30)
-        resLablel.place(x=initX, y=initY + (cnt + 1) * 30)
-
-        if mode == "Insert": 
-            submitButton = tk.Button(self.root, text=mode, command=lambda: self.handleInsertData(colNames, inputEntries, resLablel))
-            submitButton.place(x=initX + 100, y=initY + cnt * 30)
-        else: 
-            updateButton = tk.Button(self.root, text=mode, command=self.handleUpdateData)
-            updateButton.place(x=initX + 100, y=initY + cnt * 30)
-        
-        print("Generationg complete")
 
     def initHomeMenu(self): 
         print("Main menu")
