@@ -1,4 +1,4 @@
-# excel-processor
+# Simple-Excel-Processor
 ## Introduction
 This is a simple excel file process program that I created with Python. Users can use this program to perform CRUD operations on Excel files
 
