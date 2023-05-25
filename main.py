@@ -8,11 +8,29 @@ class ExcelProcessor:
     def __init__(self):
         self.df = None
         self.tree = None
+        self.selected = None
 
     def itemSelected(self, event): 
         selectedItem = self.tree.focus()
-        values = self.tree.item(selectedItem, "values")
-        print(values)
+        id = int(selectedItem[1:], 16)
+        self.selected = self.df.loc[id-1]
+        print(self.selected)
+    
+    def UpdateData(self): 
+        print("Click update")
+        # impl update
+        self.genForm("Update")
+        return None
+    
+    def handleUpdateData(self):
+        print("Handling update...")
+        # impl hanlde update
+        return None
+    
+    def handleDeleteData(self):
+        print("Click delete")
+        # impl delete
+        return None 
 
     def initTree(self):
         colNames = self.df.columns.tolist()
@@ -26,6 +44,11 @@ class ExcelProcessor:
             self.tree.insert("", "end", values=row) 
 
         self.tree.place(x=10, y=50, height=500)
+
+        updateButton = tk.Button(self.root, text="Update", command=self.UpdateData)
+        deleteButton = tk.Button(self.root, text="Delete", command=self.handleDeleteData)
+        updateButton.place(x=10, y=560)
+        deleteButton.place(x=70, y=560)
 
     def openFile(self): 
         filePath = filedialog.askopenfilename(filetypes=[("Excel Files", "*.xlsx")])
@@ -63,17 +86,8 @@ class ExcelProcessor:
         for row in res.itertuples(index=False): 
             self.tree.insert("", "end", values=row) 
 
-        # self.tree.place(x=10, y=50, height=500)
-
-    def handleAdvSearch(self, colNames, inputEntries, initX, initY, cnt): 
-        print("Searching...")
-        # get user input 
-        inputData = {}
-        for colName in colNames:
-            entryValue = inputEntries[colName].get()
-            inputData[colName] = entryValue
-
-        # accurate search 
+    def getMatchingRows(self, inputData, mode):
+        # execute search
         matchingRows = []
         for i, row in self.df.iterrows():
             match = True
@@ -83,12 +97,28 @@ class ExcelProcessor:
                 if str(inputData[colName]) == "":
                     print("The column " + colName + "is empty") 
                     continue
-                if str(row[colName]) != value: 
-                    match = False
-                    break
+                if mode == "adv":
+                    if value not in str(row[colName]): 
+                        match = False
+                        break
+                else: 
+                    if str(row[colName]) != value:
+                        match = False
+                        break
             if match: 
                 matchingRows.append(row)
-        matchingDf = pd.DataFrame(matchingRows)
+
+        return pd.DataFrame(matchingRows)
+
+    def handleAdvSearch(self, colNames, inputEntries, initX, initY, cnt): 
+        print("Searching...")
+        # get user input 
+        inputData = {}
+        for colName in colNames:
+            entryValue = inputEntries[colName].get()
+            inputData[colName] = entryValue
+        # get matching rows
+        matchingDf = self.getMatchingRows(inputData, "adv")
 
         cols = tuple(colNames)
         self.tree = ttk.Treeview(root, columns=cols, show="headings")
@@ -98,7 +128,11 @@ class ExcelProcessor:
         for row in matchingDf.itertuples(index=False): 
             self.tree.insert("", "end", values=row) 
 
-        self.tree.place(x=initX + 400, y=initY, height=500)
+        self.tree.place(x=initX + 250, y=initY, height=500)
+        deleteButton = tk.Button(self.root, text="Delete", command=self.handleDeleteData)
+        updateButton = tk.Button(self.root, text="Update", command=self.handleUpdateData)
+        updateButton.place(x=initX + 250, y=515)
+        deleteButton.place(x=initX + 310, y=515)
 
     def advSearch(self): 
         print("Switch to advanced search")
@@ -131,6 +165,46 @@ class ExcelProcessor:
         searchButton.place(x=initX + 100, y=initY + cnt * 30)
         cancelButton.place(x=initX + 160, y=initY + cnt * 30)
 
+    def genForm(self, mode): 
+        if self.df is None: 
+            print("Please open an excel file")
+            return 
+        print("Generating form...")
+
+        # clear layout
+        for widget in self.root.winfo_children():
+            widget.destroy()
+
+        # generate form
+        initX = 10
+        initY = 10
+        cnt = 0
+        colNames = self.df.columns.tolist()
+        inputEntries = {}
+        for colName in colNames:
+            label = tk.Label(self.root, text=colName)
+            entry = tk.Entry(self.root)
+            label.place(x=initX, y=initY + cnt * 30)
+            entry.place(x=initX + 100, y=initY + cnt * 30)   
+            cnt += 1 
+            
+            inputEntries[colName] = entry
+
+        # generate other components
+        resLablel = tk.Label(self.root, text="")        
+        cancelButton = tk.Button(self.root, text="Cancel", command=self.initHomeMenu)
+        cancelButton.place(x=initX + 160, y=initY + cnt * 30)
+        resLablel.place(x=initX, y=initY + (cnt + 1) * 30)
+
+        if mode == "Insert": 
+            submitButton = tk.Button(self.root, text=mode, command=lambda: self.handleInsertData(colNames, inputEntries, resLablel))
+            submitButton.place(x=initX + 100, y=initY + cnt * 30)
+        else: 
+            updateButton = tk.Button(self.root, text=mode, command=self.handleUpdateData)
+            updateButton.place(x=initX + 100, y=initY + cnt * 30)
+        
+        print("Generationg complete")
+
     def initHomeMenu(self): 
         print("Main menu")
         # clear GUI
@@ -141,7 +215,7 @@ class ExcelProcessor:
         entry = tk.Entry(root, text="")
         openButton = tk.Button(root, text="Open Excel file", command=self.openFile)
         searchButton = tk.Button(root, text="Search", command=lambda: self.handleFuzzySearch(entry))
-        insertButton = tk.Button(root, text="Insert Data", command=self.insertData)
+        insertButton = tk.Button(root, text="Insert Data", command=lambda: self.genForm("Insert"))
         AdvSearchButton = tk.Button(root, text="Advanced Search", command=self.advSearch)
 
         openButton.place(x=10, y=10) 
@@ -176,43 +250,9 @@ class ExcelProcessor:
         for entry in inputEntries.values():
             entry.delete(0, tk.END)
 
-
-    def insertData(self): 
-        print("Insert data")
-        if self.df is None: 
-            print("Please open an excel file")
-            return 
-        
-        # clear layout
-        for widget in self.root.winfo_children():
-            widget.destroy()
-
-        # generate form
-        initX = 10
-        initY = 10
-        cnt = 0
-        colNames = self.df.columns.tolist()
-        inputEntries = {}
-        for colName in colNames:
-            label = tk.Label(self.root, text=colName)
-            entry = tk.Entry(self.root)
-            label.place(x=initX, y=initY + cnt * 30)
-            entry.place(x=initX + 100, y=initY + cnt * 30)   
-            cnt += 1 
-            
-            inputEntries[colName] = entry
-
-        # generate other components
-        resLablel = tk.Label(self.root, text="")        
-        submitButton = tk.Button(self.root, text="Submit", command=lambda: self.handleInsertData(colNames, inputEntries, resLablel))
-        cancelButton = tk.Button(self.root, text="Cancel", command=self.initHomeMenu)
-        submitButton.place(x=initX + 100, y=initY + cnt * 30)
-        cancelButton.place(x=initX + 160, y=initY + cnt * 30)
-        resLablel.place(x=initX, y=initY + (cnt + 1) * 30)
-
 root = tk.Tk()
 root.title("Simple Excel Processor")
-root.minsize(width=470, height=300)
+root.minsize(width=1500, height=650)
 
 ep = ExcelProcessor()
 ep.root = root
