@@ -1,22 +1,26 @@
 import tkinter as tk
 import pandas as pd
+import numpy as np
 from tkinter import filedialog
 from tkinter import messagebox
 from tkinter import ttk
+
 
 class ExcelProcessor: 
     def __init__(self):
         self.df = None
         self.tree = None
-        self.selectedID = None
+        self.get = None
         self.selected = None
+        self.selectedID = None
+        self.selectedItem = None
 
     def itemSelected(self, event): 
-        selectedItem = self.tree.focus()
-        id = int(selectedItem[1:], 16)
-        self.selectedID = id-1
-        self.selected = self.df.loc[id-1]
-        print(self.selectedID)
+        self.selectedItem = int(self.tree.focus())
+        self.selected = self.get.iloc[self.selectedItem-1]
+        self.selectedID = self.selected.name
+        print(self.selected)
+        print(self.selected.name)
 
     def genForm(self, mode): 
         if self.df is None: 
@@ -58,7 +62,7 @@ class ExcelProcessor:
         
         print("Generationg complete")
     
-    def UpdateData(self): 
+    def updateData(self): 
         # generate form
         self.genForm("Update")
 
@@ -95,14 +99,15 @@ class ExcelProcessor:
         try: 
             self.df.drop(index=self.selectedID, inplace=True)
             self.df.to_excel(self.filePath, index=False)
+            self.tree.delete(self.tree.get_children()[self.selectedItem-1])
+            
             self.selected = None
             self.selectedID = None
-            print("Delete successful")
+            self.selectedItem = None
+            print("Deletion successful")
         except: 
             print("Deletion failed")
 
-        # refresh home menu
-        self.initHomeMenu()
 
     def initTree(self):
         colNames = self.df.columns.tolist()
@@ -111,13 +116,15 @@ class ExcelProcessor:
         self.tree = ttk.Treeview(root, columns=cols, show="headings")
         self.tree.bind("<<TreeviewSelect>>", self.itemSelected)
         for col in cols: 
-            self.tree.heading(col, text=col)        
+            self.tree.heading(col, text=col)    
+        cnt = 1    
         for row in self.df.itertuples(index=False): 
-            self.tree.insert("", "end", values=row) 
+            self.tree.insert("", "end", iid=cnt, values=row) 
+            cnt += 1
 
         self.tree.place(x=10, y=50, height=500)
 
-        updateButton = tk.Button(self.root, text="Update", command=self.UpdateData)
+        updateButton = tk.Button(self.root, text="Update", command=self.updateData)
         deleteButton = tk.Button(self.root, text="Delete", command=self.handleDeleteData)
         updateButton.place(x=10, y=560)
         deleteButton.place(x=70, y=560)
@@ -129,6 +136,7 @@ class ExcelProcessor:
             try: 
                 print("Openning file...")
                 self.df = pd.read_excel(filePath)
+                self.get = self.df
                 self.filePath = filePath
                 self.initTree()
                 print("File Opened")
@@ -152,11 +160,15 @@ class ExcelProcessor:
             # search each columns
             for colName in colNames: 
                 matchingRows = self.df[self.df[colName].astype(str).str.contains(inputData, case=False)]
-                print(matchingRows)
-                res = pd.concat([res, matchingRows], ignore_index=True)
-         
+                res = pd.concat([res, matchingRows], ignore_index=False)
+
+        self.get = res 
+        # self.initTree()
+        cnt = 1
+        print("____________")
         for row in res.itertuples(index=False): 
-            self.tree.insert("", "end", values=row) 
+            self.tree.insert("", "end", iid=cnt, values=row) 
+            cnt += 1
 
     def getMatchingRows(self, inputData, mode):
         # execute search
@@ -182,7 +194,7 @@ class ExcelProcessor:
 
         return pd.DataFrame(matchingRows)
 
-    def handleAdvSearch(self, colNames, inputEntries, initX, initY, cnt): 
+    def handleAdvSearch(self, colNames, inputEntries, initX, initY): 
         print("Searching...")
         # get user input 
         inputData = {}
@@ -191,18 +203,21 @@ class ExcelProcessor:
             inputData[colName] = entryValue
         # get matching rows
         matchingDf = self.getMatchingRows(inputData, "adv")
+        self.get = matchingDf
 
         cols = tuple(colNames)
         self.tree = ttk.Treeview(root, columns=cols, show="headings")
         self.tree.bind("<<TreeviewSelect>>", self.itemSelected)
         for col in cols: 
-            self.tree.heading(col, text=col)        
+            self.tree.heading(col, text=col) 
+        cnt = 1       
         for row in matchingDf.itertuples(index=False): 
-            self.tree.insert("", "end", values=row) 
+            self.tree.insert("", "end", iid=cnt, values=row) 
+            cnt += 1
 
         self.tree.place(x=initX + 250, y=initY, height=500)
         deleteButton = tk.Button(self.root, text="Delete", command=self.handleDeleteData)
-        updateButton = tk.Button(self.root, text="Update", command=self.handleUpdateData)
+        updateButton = tk.Button(self.root, text="Update", command=self.updateData)
         updateButton.place(x=initX + 250, y=515)
         deleteButton.place(x=initX + 310, y=515)
 
@@ -232,7 +247,7 @@ class ExcelProcessor:
             inputEntries[colName] = entry
 
         # generate other components
-        searchButton = tk.Button(self.root, text="Search", command=lambda: self.handleAdvSearch(colNames, inputEntries, initX, initY, cnt))
+        searchButton = tk.Button(self.root, text="Search", command=lambda: self.handleAdvSearch(colNames, inputEntries, initX, initY))
         cancelButton = tk.Button(self.root, text="Cancel", command=self.initHomeMenu)
         searchButton.place(x=initX + 100, y=initY + cnt * 30)
         cancelButton.place(x=initX + 160, y=initY + cnt * 30)
@@ -269,8 +284,8 @@ class ExcelProcessor:
             # insert data to the DataFrame
             newDf = pd.DataFrame(data, index=[0]) 
             self.df = pd.concat([self.df, newDf], ignore_index=True) 
+            self.get = self.df
             print("Data inserted successfully!")
-            print(self.df)
 
             # save updated DataFrame to Excel File
             self.df.to_excel(self.filePath, index=False)
